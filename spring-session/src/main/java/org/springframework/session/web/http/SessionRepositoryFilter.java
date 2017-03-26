@@ -153,6 +153,7 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 			throws ServletException, IOException {
 		request.setAttribute(SESSION_REPOSITORY_ATTR, this.sessionRepository);
 
+		// 封装http Request和Response
 		SessionRepositoryRequestWrapper wrappedRequest = new SessionRepositoryRequestWrapper(
 				request, response, this.servletContext);
 		SessionRepositoryResponseWrapper wrappedResponse = new SessionRepositoryResponseWrapper(
@@ -167,6 +168,8 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 			filterChain.doFilter(strategyRequest, strategyResponse);
 		}
 		finally {
+			// 处理完filter chain中的每一个filter后，http请求都会commitSession
+			// 也即是将session写入到response，并将session写入后端存储
 			wrappedRequest.commitSession();
 		}
 	}
@@ -241,6 +244,7 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 				}
 			}
 			else {
+				// 对于存在的session，save方法里面去更新session的过期时间。
 				S session = wrappedSession.getSession();
 				SessionRepositoryFilter.this.sessionRepository.save(session);
 				if (!isRequestedSessionIdValid()
@@ -251,11 +255,13 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 			}
 		}
 
+		// 获取包含请求上下文的session实例
 		@SuppressWarnings("unchecked")
 		private HttpSessionWrapper getCurrentSession() {
 			return (HttpSessionWrapper) getAttribute(CURRENT_SESSION_ATTR);
 		}
 
+		// 设置包含请求上下文的当前httpSession到请求属性中
 		private void setCurrentSession(HttpSessionWrapper currentSession) {
 			if (currentSession == null) {
 				removeAttribute(CURRENT_SESSION_ATTR);
@@ -334,10 +340,12 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 
 		@Override
 		public HttpSessionWrapper getSession(boolean create) {
+			// 获取包含请求上下文的当前的session
 			HttpSessionWrapper currentSession = getCurrentSession();
 			if (currentSession != null) {
 				return currentSession;
 			}
+			// 从request请求中得到sessionId
 			String requestedSessionId = getRequestedSessionId();
 			if (requestedSessionId != null
 					&& getAttribute(INVALID_SESSION_ID_ATTR) == null) {
@@ -369,6 +377,7 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 						new RuntimeException(
 								"For debugging purposes only (not an error)"));
 			}
+			//创建RedisSession，设置上一次访问时间为当前时间。
 			S session = SessionRepositoryFilter.this.sessionRepository.createSession();
 			session.setLastAccessedTime(System.currentTimeMillis());
 			currentSession = new HttpSessionWrapper(session, getServletContext());
@@ -385,6 +394,7 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 			return super.getServletContext();
 		}
 
+		// 默认当不存在session时，创建一个新的session
 		@Override
 		public HttpSessionWrapper getSession() {
 			return getSession(true);
@@ -402,7 +412,7 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 		 * @author Rob Winch
 		 * @since 1.0
 		 */
-		private final class HttpSessionWrapper extends ExpiringSessionHttpSession<S> {
+		private final class  HttpSessionWrapper extends ExpiringSessionHttpSession<S> {
 
 			HttpSessionWrapper(S session, ServletContext servletContext) {
 				super(session, servletContext);

@@ -184,7 +184,7 @@ import org.springframework.util.Assert;
  * </p>
  *
  * <p>
- * Expiration is not tracked directly on the session key itself since this would mean the
+ * Expiration有效期 is not tracked directly on the session key itself since this would mean the
  * session data would no longer be available. Instead a special session expires key is
  * used. In our example the expires key is:
  * </p>
@@ -209,6 +209,7 @@ import org.springframework.util.Assert;
  * </p>
  *
  * <p>
+ * 为什么给每个key都设置了过期时间，还需要有个定时任务去轮询删除expires key呢？
  * To circumvent the fact that expired events are not guaranteed to happen we can ensure
  * that each key is accessed when it is expected to expire. This means that if the TTL is
  * expired on the key, Redis will remove the key and fire the expired event when we try to
@@ -309,6 +310,7 @@ public class RedisOperationsSessionRepository implements
 
 	private RedisSerializer<Object> defaultSerializer = new JdkSerializationRedisSerializer();
 
+	// redis-session 默认在调用save方法时才去持久化session到redis中。
 	private RedisFlushMode redisFlushMode = RedisFlushMode.ON_SAVE;
 
 	/**
@@ -386,6 +388,7 @@ public class RedisOperationsSessionRepository implements
 
 	public void save(RedisSession session) {
 		session.saveDelta();
+		// 对于新的session，持久化到redis
 		if (session.isNew()) {
 			String sessionCreatedKey = getSessionCreatedChannel(session.getId());
 			this.sessionRedisOperations.convertAndSend(sessionCreatedKey, session.delta);
@@ -393,6 +396,7 @@ public class RedisOperationsSessionRepository implements
 		}
 	}
 
+	// 可以自定义 cleanup task的执行间隔
 	@Scheduled(cron = "${spring.session.cleanup.cron.expression:0 * * * * *}")
 	public void cleanupExpiredSessions() {
 		this.expirationPolicy.cleanExpiredSessions();
@@ -668,8 +672,10 @@ public class RedisOperationsSessionRepository implements
 	 * @since 1.0
 	 */
 	final class RedisSession implements ExpiringSession {
+		// MapSession作为jvm 缓存
 		private final MapSession cached;
 		private Long originalLastAccessTime;
+		// delta保存sessions的属性：创建时间，最大活跃时间，上一次访问时间
 		private Map<String, Object> delta = new HashMap<String, Object>();
 		private boolean isNew;
 		private String originalPrincipalName;
@@ -680,6 +686,7 @@ public class RedisOperationsSessionRepository implements
 		 */
 		RedisSession() {
 			this(new MapSession());
+			// 创建时间和上一次访问时间为当前时间。
 			this.delta.put(CREATION_TIME_ATTR, getCreationTime());
 			this.delta.put(MAX_INACTIVE_ATTR, getMaxInactiveIntervalInSeconds());
 			this.delta.put(LAST_ACCESSED_ATTR, getLastAccessedTime());
@@ -774,6 +781,7 @@ public class RedisOperationsSessionRepository implements
 			if (this.delta.isEmpty()) {
 				return;
 			}
+			// 保存sessions的属性
 			String sessionId = getId();
 			getSessionBoundHashOperations(sessionId).putAll(this.delta);
 			String principalSessionKey = getSessionAttrNameKey(
@@ -798,10 +806,11 @@ public class RedisOperationsSessionRepository implements
 			}
 
 			this.delta = new HashMap<String, Object>(this.delta.size());
-
+			// 上一次过期时间 = 上一次访问时间 + 最大活跃时间间隔
 			Long originalExpiration = this.originalLastAccessTime == null ? null
 					: this.originalLastAccessTime + TimeUnit.SECONDS
 							.toMillis(getMaxInactiveIntervalInSeconds());
+			// 更新sessions 和expirations相关键的过期时间
 			RedisOperationsSessionRepository.this.expirationPolicy
 					.onExpirationUpdated(originalExpiration, this);
 		}

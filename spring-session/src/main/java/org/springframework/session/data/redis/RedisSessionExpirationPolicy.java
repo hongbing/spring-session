@@ -67,13 +67,20 @@ final class RedisSessionExpirationPolicy {
 		this.redis.boundSetOps(expireKey).remove(session.getId());
 	}
 
+	/**
+	 * 更新session的过期数据
+	 * @param originalExpirationTimeInMilli 上一次过期时间
+	 * @param session
+	 */
 	public void onExpirationUpdated(Long originalExpirationTimeInMilli,
 			ExpiringSession session) {
 		String keyToExpire = "expires:" + session.getId();
+		// session被访问后将要过期的下一分钟
 		long toExpire = roundUpToNextMinute(expiresInMillis(session));
 
 		if (originalExpirationTimeInMilli != null) {
 			long originalRoundedUp = roundUpToNextMinute(originalExpirationTimeInMilli);
+			// 更新expirations:[min],前后两次过期时间不在同一分钟内，将前一个过期时间内的expires key删除
 			if (toExpire != originalRoundedUp) {
 				String expireKey = getExpirationKey(originalRoundedUp);
 				this.redis.boundSetOps(expireKey).remove(keyToExpire);
@@ -90,6 +97,7 @@ final class RedisSessionExpirationPolicy {
 			return;
 		}
 
+		// 设置下一次过期时间的expirations key
 		String expireKey = getExpirationKey(toExpire);
 		BoundSetOperations<Object, Object> expireOperations = this.redis
 				.boundSetOps(expireKey);
@@ -98,23 +106,28 @@ final class RedisSessionExpirationPolicy {
 		long fiveMinutesAfterExpires = sessionExpireInSeconds
 				+ TimeUnit.MINUTES.toSeconds(5);
 
+		// expirations:[min] key的过期时间加5分钟
 		expireOperations.expire(fiveMinutesAfterExpires, TimeUnit.SECONDS);
 		if (sessionExpireInSeconds == 0) {
 			this.redis.delete(sessionKey);
 		}
 		else {
+			// expires:[sessionId] 值为“”，过期时间为MaxInactiveIntervalInSeconds
 			this.redis.boundValueOps(sessionKey).append("");
 			this.redis.boundValueOps(sessionKey).expire(sessionExpireInSeconds,
 					TimeUnit.SECONDS);
 		}
+		// sessions:[sessionId]的过期时间 加5分钟
 		this.redis.boundHashOps(getSessionKey(session.getId()))
 				.expire(fiveMinutesAfterExpires, TimeUnit.SECONDS);
 	}
 
+	// spring:session:expirations:[expiresTime]
 	String getExpirationKey(long expires) {
 		return this.redisSession.getExpirationsKey(expires);
 	}
 
+	// spring:session:sessions:[sessionId]
 	String getSessionKey(String sessionId) {
 		return this.redisSession.getSessionKey(sessionId);
 	}
@@ -126,12 +139,15 @@ final class RedisSessionExpirationPolicy {
 		if (logger.isDebugEnabled()) {
 			logger.debug("Cleaning up sessions expiring at " + new Date(prevMin));
 		}
-
+		// preMin时间到，将spring:session:expirations:[min], set集合中members包括了这一分钟之内需要过期的所有
+		// expire key删掉, member元素为expires:[sessionId]
 		String expirationKey = getExpirationKey(prevMin);
 		Set<Object> sessionsToExpire = this.redis.boundSetOps(expirationKey).members();
 		this.redis.delete(expirationKey);
 		for (Object session : sessionsToExpire) {
+			// sessionKey为spring:session:sessions:expires:[sessionId]
 			String sessionKey = getSessionKey((String) session);
+			//利用redis的惰性删除策略
 			touch(sessionKey);
 		}
 	}
@@ -153,6 +169,7 @@ final class RedisSessionExpirationPolicy {
 		return lastAccessedTimeInMillis + TimeUnit.SECONDS.toMillis(maxInactiveInSeconds);
 	}
 
+	// 下一分钟的ms数
 	static long roundUpToNextMinute(long timeInMs) {
 
 		Calendar date = Calendar.getInstance();
@@ -163,6 +180,7 @@ final class RedisSessionExpirationPolicy {
 		return date.getTimeInMillis();
 	}
 
+	// 向下取整的那一分钟对应的ms数
 	static long roundDownMinute(long timeInMs) {
 		Calendar date = Calendar.getInstance();
 		date.setTimeInMillis(timeInMs);
