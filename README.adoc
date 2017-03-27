@@ -2,6 +2,9 @@ image:https://badges.gitter.im/spring-projects/spring-session.svg[link="https://
 
 image:https://travis-ci.org/spring-projects/spring-session.svg?branch=master["Build Status", link="https://travis-ci.org/spring-projects/spring-session"]
 
+= 注释分支
+添加注释的分支从spring-session-1.3.0.RELEASE牵出来。
+
 = Spring Session
 Rob Winch
 
