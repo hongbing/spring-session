@@ -47,6 +47,9 @@ import org.springframework.session.data.redis.RedisFlushMode;
  *
  * More advanced configurations can extend {@link RedisHttpSessionConfiguration} instead.
  *
+ *
+ * @Configuration 注解相当于xml文件里的<beans><beans/>，配置spring bean容器
+ *
  * @author Rob Winch
  * @since 1.0
  * @see EnableSpringHttpSession

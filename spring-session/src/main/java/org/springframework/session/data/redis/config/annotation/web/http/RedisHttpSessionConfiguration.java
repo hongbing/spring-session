@@ -57,6 +57,10 @@ import org.springframework.util.StringValueResolver;
  * "springSessionRepositoryFilter". In order to use this a single
  * {@link RedisConnectionFactory} must be exposed as a Bean.
  *
+ * 需要在外部配置 RedisConnectionFactory的bean，RedisHttpSessionConfiguration里面使用注解定义的bean，
+ * 如RedisMessageListenerContainer，RedisTemplate等都需要 RedisConnectionFactory Bean作为参数。
+ *
+ *
  * @author Rob Winch
  * @author Eddú Meléndez
  * @see EnableRedisHttpSession
@@ -83,6 +87,13 @@ public class RedisHttpSessionConfiguration extends SpringHttpSessionConfiguratio
 
 	private StringValueResolver embeddedValueResolver;
 
+	/**
+	 *
+	 * @Bean 注解相当于xml配置里面的<bean></bean>, 如果@Bean注解没有配置 bean名，使用方法名作为bean的id。
+	 * @param connectionFactory
+	 * @param messageListener
+	 * @return
+	 */
 	@Bean
 	public RedisMessageListenerContainer redisMessageListenerContainer(
 			RedisConnectionFactory connectionFactory,

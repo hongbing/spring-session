@@ -310,7 +310,9 @@ public class RedisOperationsSessionRepository implements
 
 	private RedisSerializer<Object> defaultSerializer = new JdkSerializationRedisSerializer();
 
-	// redis-session 默认在调用save方法时才去持久化session到redis中。
+	/**
+	 * redis-session 默认在调用save方法时才去持久化session到redis中。
+	 */
 	private RedisFlushMode redisFlushMode = RedisFlushMode.ON_SAVE;
 
 	/**
