@@ -88,6 +88,10 @@ public class RedisHttpSessionConfiguration extends SpringHttpSessionConfiguratio
 	private StringValueResolver embeddedValueResolver;
 
 	/**
+	 * RedisMessageListenerContainer 保存Redis消息监听器的容器。将RedisOperationsSessionRepository添加到容器内,RedisOperationsSessionRepository实现了MessageListener。
+	 * 监听的Redis实例由 RedisConnectionFactory指定，监听键事件：del,expired,created:event
+	 * 当redis实例产生上述的键事件，RedisOperationsSessionRepository在OnMessage()方法里面处理。
+	 *
 	 *
 	 * @Bean 注解相当于xml配置里面的<bean></bean>, 如果@Bean注解没有配置 bean名，使用方法名作为bean的id。
 	 * @param connectionFactory
@@ -184,6 +188,12 @@ public class RedisHttpSessionConfiguration extends SpringHttpSessionConfiguratio
 		this.redisFlushMode = enableAttrs.getEnum("redisFlushMode");
 	}
 
+	/**
+	 * 允许设置Redis实例的键空间配置
+	 * 使用的Redis实例必须配置 键空间通知，通知的键事件在configureRedisAction里面设置。
+	 * @param connectionFactory
+	 * @return
+	 */
 	@Bean
 	public InitializingBean enableRedisKeyspaceNotificationsInitializer(
 			RedisConnectionFactory connectionFactory) {

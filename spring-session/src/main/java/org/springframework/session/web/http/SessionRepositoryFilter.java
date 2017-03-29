@@ -16,10 +16,12 @@
 
 package org.springframework.session.web.http;
 
-import java.io.IOException;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.core.annotation.Order;
+import org.springframework.session.ExpiringSession;
+import org.springframework.session.Session;
+import org.springframework.session.SessionRepository;
 
 import javax.servlet.FilterChain;
 import javax.servlet.ServletContext;
@@ -28,14 +30,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import org.springframework.core.annotation.Order;
-import org.springframework.session.ExpiringSession;
-import org.springframework.session.Session;
-import org.springframework.session.SessionRepository;
+import java.io.IOException;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Switches the {@link javax.servlet.http.HttpSession} implementation to be backed by a
@@ -377,7 +375,8 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 						new RuntimeException(
 								"For debugging purposes only (not an error)"));
 			}
-			//创建RedisSession，设置上一次访问时间为当前时间。
+
+			//无法获得session，创建RedisSession，设置上一次访问时间为当前时间。
 			S session = SessionRepositoryFilter.this.sessionRepository.createSession();
 			session.setLastAccessedTime(System.currentTimeMillis());
 			currentSession = new HttpSessionWrapper(session, getServletContext());
@@ -394,7 +393,11 @@ public class SessionRepositoryFilter<S extends ExpiringSession>
 			return super.getServletContext();
 		}
 
-		// 默认当不存在session时，创建一个新的session
+		/**
+		 * 业务获取session的入口
+		 * 默认创建一个新的session
+		 * @return
+		 */
 		@Override
 		public HttpSessionWrapper getSession() {
 			return getSession(true);

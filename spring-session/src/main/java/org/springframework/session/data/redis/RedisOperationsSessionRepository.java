@@ -16,15 +16,8 @@
 
 package org.springframework.session.data.redis;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.connection.Message;
@@ -49,6 +42,12 @@ import org.springframework.session.events.SessionDestroyedEvent;
 import org.springframework.session.events.SessionExpiredEvent;
 import org.springframework.session.web.http.SessionRepositoryFilter;
 import org.springframework.util.Assert;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <p>
@@ -393,11 +392,19 @@ public class RedisOperationsSessionRepository implements
 		// 对于新的session，持久化到redis
 		if (session.isNew()) {
 			String sessionCreatedKey = getSessionCreatedChannel(session.getId());
+			// 在redis实例publish sessionCreatedKey
 			this.sessionRedisOperations.convertAndSend(sessionCreatedKey, session.delta);
 			session.setNew(false);
 		}
 	}
 
+	/**
+	 * 定时清理过期的key，包括sessionKey，expiration key。
+	 * 由于redis对于过期数据的清理采用的是懒处理方式，对于过期key的删除可能在该key真正过期很久以后了。
+	 * 对于注册的redis 键事件通知，如果key过期或者删除不及时，监听器的后续操作就不能保证。
+	 * 因此在这里采用crontab定时检查。
+	 *
+	 */
 	// 可以自定义 cleanup task的执行间隔
 	@Scheduled(cron = "${spring.session.cleanup.cron.expression:0 * * * * *}")
 	public void cleanupExpiredSessions() {
@@ -503,6 +510,7 @@ public class RedisOperationsSessionRepository implements
 
 		String channel = new String(messageChannel);
 
+		// 监听到Redis实例的createEvent事件
 		if (channel.startsWith(getSessionCreatedChannelPrefix())) {
 			// TODO: is this thread safe?
 			Map<Object, Object> loaded = (Map<Object, Object>) this.defaultSerializer
@@ -553,6 +561,15 @@ public class RedisOperationsSessionRepository implements
 		}
 	}
 
+	/**
+	 * 处理redis的created:event事件，loaded为session的delta数据，从channel中取出sessionId。
+	 * 将创建session的事件在spring事件机制中发布。
+	 * 在SpringHttpSessionConfiguration中声明了SessionEventHttpSessionListenerAdapter，
+	 * SessionEventHttpSessionListenerAdapter中包含的所有HttpSessionListener会来处理发布的session事件
+	 *
+	 * @param loaded
+	 * @param channel
+	 */
 	public void handleCreated(Map<Object, Object> loaded, String channel) {
 		String id = channel.substring(channel.lastIndexOf(":") + 1);
 		ExpiringSession session = loadSession(id, loaded);
@@ -812,7 +829,7 @@ public class RedisOperationsSessionRepository implements
 			Long originalExpiration = this.originalLastAccessTime == null ? null
 					: this.originalLastAccessTime + TimeUnit.SECONDS
 							.toMillis(getMaxInactiveIntervalInSeconds());
-			// 更新sessions 和expirations相关键的过期时间
+			// 每一次用户访问，都去更新sessions 和expirations相关键的过期时间
 			RedisOperationsSessionRepository.this.expirationPolicy
 					.onExpirationUpdated(originalExpiration, this);
 		}

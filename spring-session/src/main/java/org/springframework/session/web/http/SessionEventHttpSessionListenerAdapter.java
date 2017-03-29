@@ -16,19 +16,18 @@
 
 package org.springframework.session.web.http;
 
-import java.util.List;
-
-import javax.servlet.ServletContext;
-import javax.servlet.http.HttpSession;
-import javax.servlet.http.HttpSessionEvent;
-import javax.servlet.http.HttpSessionListener;
-
 import org.springframework.context.ApplicationListener;
 import org.springframework.session.ExpiringSession;
 import org.springframework.session.events.AbstractSessionEvent;
 import org.springframework.session.events.SessionCreatedEvent;
 import org.springframework.session.events.SessionDestroyedEvent;
 import org.springframework.web.context.ServletContextAware;
+
+import javax.servlet.ServletContext;
+import javax.servlet.http.HttpSession;
+import javax.servlet.http.HttpSessionEvent;
+import javax.servlet.http.HttpSessionListener;
+import java.util.List;
 
 /**
  * Receives {@link SessionDestroyedEvent} and {@link SessionCreatedEvent} and translates
@@ -49,11 +48,13 @@ public class SessionEventHttpSessionListenerAdapter
 		this.listeners = listeners;
 	}
 
-	/*
+	/**
 	 * (non-Javadoc)
 	 *
 	 * @see org.springframework.context.ApplicationListener#onApplicationEvent(org.
 	 * springframework.context.ApplicationEvent)
+	 *
+	 * 对于注册的HttpSessionListener，处理接收到的Session事件。
 	 */
 	public void onApplicationEvent(AbstractSessionEvent event) {
 		if (this.listeners.isEmpty()) {
